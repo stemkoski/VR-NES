@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>NES</title>
+	<meta name="description" content="NES">
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+	<script src="js/aframe-master-v1.3.0.min.js"></script>
+	<script src="js/aframe-environment-component.js"></script>
+	<script src="js/extended-wasd-controls.js"></script>
+	<script src="js/jsnes.min.js"></script>
+	<script src="js/gltf-modifier.js"></script>
+</head>
+
+<body>
+
+<script>
+AFRAME.registerComponent('nes-canvas', {
+
+	init: function()
+	{
+    	this.nesRunning = false;
+
+		let self = this;
+		  
+		onkeydown = function(eventData)
+	    {
+	    	if (!self.nesRunning)
+		       	self.nesStart();
+	    }
+
+		this.el.sceneEl.renderer.xr.addEventListener( 'sessionstart', function(eventData) {
+			if (!self.nesRunning)
+		       	self.nesStart();
+
+			// these components are not compatible
+			let p = document.querySelector("#player");
+			p.setAttribute("player-move", "");
+			p.removeAttribute("extended-wasd-controls");
+			p.object3D.position.y = 0.4;
+		});
+	    
+	},
+
+	nesStart: async function()
+	{
+			this.nesRunning = true;
+
+			const canvas = document.querySelector("#canvas");
+			const context = canvas.getContext("2d");
+			const imageData = context.getImageData(0,0,256,240);
+			const framebuffer = new ArrayBuffer(imageData.data.length);
+			const framebuffer_u8 = new Uint8ClampedArray(framebuffer);
+			const framebuffer_u32 = new Uint32Array(framebuffer);
+
+			// AUDIO WORKLET
+			const audioContext = new AudioContext();
+			await audioContext.audioWorklet.addModule('js/audio-worklet.js');
+			const nesAudioNode = new AudioWorkletNode(audioContext, 'nes-audio-processor')
+			nesAudioNode.connect(audioContext.destination)
+
+			let self = this;
+
+			const urlParams = new URLSearchParams(window.location.search);
+
+			const fileBase = (urlParams.has("file")) ? urlParams.get("file") : "LJ65";
+			const fileName = "roms/" + fileBase + ".nes";
+			const file = new XMLHttpRequest();
+			file.open('GET', fileName);
+			file.overrideMimeType("text/plain; charset=x-user-defined");
+			file.send();
+			file.onload = function()
+			{
+	 			self.nes = new jsnes.NES({
+	      
+			      onFrame: function(framebuffer_24)
+			      {
+			        for(var i = 0; i < 256*240; i++) 
+								framebuffer_u32[i] = 0xFF000000 | framebuffer_24[i];
+			        imageData.data.set(framebuffer_u8);
+			        context.putImageData(imageData, 0, 0);
+			      },
+	      
+			      onAudioSample: function(left, right)
+						{
+							nesAudioNode.port.postMessage({left: left, right: right});
+						}
+
+	    		});
+
+	    		self.nes.loadROM(file.responseText);
+	    
+			    // 88: "X", 67: "C", 32: Space, 13: Enter
+			    var keyNames = { 37: "LEFT", 38: "UP", 39: "RIGHT", 40: "DOWN", 88: "B", 67: "A", 32: "SELECT", 13: "START" };
+
+			    // controller #1 key listeners
+			    onkeydown = function(eventData)
+			    {
+			        self.nes.buttonDown(1, jsnes.Controller["BUTTON_" + keyNames[eventData.keyCode]] );
+			    }
+
+			    onkeyup = function(eventData)
+			    {
+			      	self.nes.buttonUp(1, jsnes.Controller["BUTTON_" + keyNames[eventData.keyCode]] );
+			    }
+			}
+
+			// limit to 60 FPS
+			this.tick = AFRAME.utils.throttleTick(this.tick, 16, this);
+
+			this.leftController  = document.querySelector("#left-controller");
+			this.rightController = document.querySelector("#right-controller");
+
+			this.leftGripDown = false;
+
+	        this.leftController.addEventListener("gripdown", function(event)
+	          { self.leftGripDown = true; } );      
+
+	        this.leftController.addEventListener("gripup", function(event)
+	          { self.leftGripDown = false; } );
+
+			this.buttonLeftPressed  = false;
+			this.buttonRightPressed = false;
+			this.buttonUpPressed    = false;
+			this.buttonDownPressed  = false;
+
+			this.leftController.addEventListener('thumbstickmoved', function(event) { 
+				
+				// left grip disables NES control / switches to movement control
+				if (self.leftGripDown)
+					return;
+
+				if (event.detail.x > 0.5 && !self.buttonRightPressed)
+				{
+					self.nes.buttonDown(1, jsnes.Controller.BUTTON_RIGHT)
+					self.buttonRightPressed = true;
+				}
+				else if (event.detail.x < 0.5 && self.buttonRightPressed)
+				{
+					self.nes.buttonUp(1, jsnes.Controller.BUTTON_RIGHT)
+					self.buttonRightPressed = false;          		
+				}
+
+				if (event.detail.x < -0.5 && !self.buttonLeftPressed)
+				{
+					self.nes.buttonDown(1, jsnes.Controller.BUTTON_LEFT)
+					self.buttonLeftPressed = true;
+				}
+				else if (event.detail.x > -0.5 && self.buttonLeftPressed)
+				{
+					self.nes.buttonUp(1, jsnes.Controller.BUTTON_LEFT)
+					self.buttonLeftPressed = false;          		
+				}
+
+				if (event.detail.y > 0.5 && !self.buttonDownPressed)
+				{
+					self.nes.buttonDown(1, jsnes.Controller.BUTTON_DOWN)
+					self.buttonDownPressed = true;
+				}
+				else if (event.detail.y < 0.5 && self.buttonDownPressed)
+				{
+					self.nes.buttonUp(1, jsnes.Controller.BUTTON_DOWN)
+					self.buttonDownPressed = false;          		
+				}
+
+				if (event.detail.y < -0.5 && !self.buttonUpPressed)
+				{
+					self.nes.buttonDown(1, jsnes.Controller.BUTTON_UP)
+					self.buttonUpPressed = true;
+				}
+				else if (event.detail.y > -0.5 && self.buttonUpPressed)
+				{
+					self.nes.buttonUp(1, jsnes.Controller.BUTTON_UP)
+					self.buttonUpPressed = false;          		
+				}
+
+			});
+
+	    this.leftController.addEventListener("xbuttondown", function(event)
+	    	{ self.nes.buttonDown(1, jsnes.Controller.BUTTON_START) });
+	    this.leftController.addEventListener("xbuttonup", function(event)
+	    	{ self.nes.buttonUp(1, jsnes.Controller.BUTTON_START) });
+
+	    this.leftController.addEventListener("ybuttondown", function(event)
+	    	{ self.nes.buttonDown(1, jsnes.Controller.BUTTON_SELECT) });
+	    this.leftController.addEventListener("ybuttonup", function(event)
+	    	{ self.nes.buttonUp(1, jsnes.Controller.BUTTON_SELECT) });
+
+	    this.rightController.addEventListener("abuttondown", function(event)
+	    	{ self.nes.buttonDown(1, jsnes.Controller.BUTTON_A) });
+	    this.rightController.addEventListener("abuttonup", function(event)
+	    	{ self.nes.buttonUp(1, jsnes.Controller.BUTTON_A) });
+
+	    this.rightController.addEventListener("bbuttondown", function(event)
+	    	{ self.nes.buttonDown(1, jsnes.Controller.BUTTON_B) });
+	    this.rightController.addEventListener("bbuttonup", function(event)
+	    	{ self.nes.buttonUp(1, jsnes.Controller.BUTTON_B) });
+
+	},
+	
+	tick: function(time, deltaTime)
+	{
+		if (this.nes)
+			this.nes.frame();
+
+		let material = this.el.getObject3D('mesh').material;
+	    if (material.map)
+        	material.map.needsUpdate = true;
+	}
+	
+});
+
+AFRAME.registerComponent('player-move', {
+
+	init: function()
+	{
+        this.player = this.el;        
+
+        // event listeners and values
+
+        this.leftController  = document.querySelector("#left-controller");
+        this.rightController = document.querySelector("#right-controller");
+
+		this.leftAxisX     = 0;
+		this.leftAxisY     = 0;
+		this.leftTrigger   = 0;
+		this.leftGripDown  = false;
+		this.rightAxisX    = 0;
+		this.rightAxisY    = 0;
+		this.rightTrigger  = 0;
+		this.rightGripDown = false;		
+
+		let self = this;
+
+        this.leftController.addEventListener('thumbstickmoved', function(event)
+          { self.leftAxisX = event.detail.x; 
+            self.leftAxisY = event.detail.y; } );
+
+        this.leftController.addEventListener('triggerchanged', function (event) 
+          { self.leftTrigger = event.detail.value; } );
+
+        this.leftController.addEventListener("gripdown", function(event)
+          { self.leftGripDown = true; } );      
+
+        this.leftController.addEventListener("gripup", function(event)
+          { self.leftGripDown = false; } );
+
+        this.rightController.addEventListener('thumbstickmoved', function(event)
+          { self.rightAxisX = event.detail.x; 
+            self.rightAxisY = event.detail.y; } );
+
+        this.rightController.addEventListener('triggerchanged', function (event) 
+          { self.rightTrigger = event.detail.value; } );
+
+        this.rightController.addEventListener("gripdown", function(event)
+          { self.rightGripDown = true; } );      
+
+        this.rightController.addEventListener("gripup", function(event)
+          { self.rightGripDown = false; } );
+
+        // movement parameters
+
+        this.moveSpeed = 1;
+        this.cameraDirection = new THREE.Vector3();
+
+        this.turnReady = true;
+        this.turnAmount = Math.PI / 4; // 45 degrees
+        this.turnDirection = 1;
+        this.turnDuration = 0.10;
+        this.turnTime = 0;
+        this.turnInProgress = false;		
+	},
+
+	tick: function(time, deltaTime)
+	{
+        // move with left joystick; move faster when also pressing trigger
+        this.leftJoystickLength = Math.sqrt(this.leftAxisX * this.leftAxisX + 
+                                            this.leftAxisY * this.leftAxisY );
+
+        if ( this.leftGripDown && this.leftJoystickLength > 0.01 )
+        {
+            // this.cameraDirection: a vector to store camera direction
+            this.player.sceneEl.camera.getWorldDirection(this.cameraDirection);
+            this.cameraAngle = Math.atan2(this.cameraDirection.z, this.cameraDirection.x);
+
+            this.leftJoystickAngle = Math.atan2(this.leftAxisY, this.leftAxisX);
+            
+            this.moveAngle = this.cameraAngle + this.leftJoystickAngle;
+
+            this.moveDistance = this.moveSpeed * deltaTime / 1000;
+            // move faster if pressing trigger at same time
+            this.moveDistance *= (1 + 4 * this.leftTrigger);
+
+            // convert move distance and angle to right and forward amounts
+            // scale by magnitude of joystick press (smaller press moves player slower)
+            this.moveRight   = -this.leftJoystickLength * Math.sin(this.moveAngle) * this.moveDistance;
+            this.moveForward =  this.leftJoystickLength * Math.cos(this.moveAngle) * this.moveDistance;
+            this.player.object3D.position.x = this.player.object3D.position.x + this.moveRight;
+            this.player.object3D.position.z = this.player.object3D.position.z + this.moveForward;
+        }
+
+        // vertical movement
+
+        if ( this.rightGripDown && Math.abs(this.rightAxisY) > 0.01 )
+        {
+            this.moveDistance = -this.moveSpeed * this.rightAxisY * (deltaTime / 1000);
+            // move faster if pressing trigger at same time
+            this.moveDistance *= (1 + 4 * this.rightTrigger);
+
+            this.player.object3D.position.y = this.player.object3D.position.y + this.moveDistance;
+        }
+
+        // snap turns
+
+        if ( Math.abs(this.rightAxisX) < 0.20 )
+        {           
+            this.turnReady = true;
+        }
+
+        if ( this.turnReady && Math.abs(this.rightAxisX) > 0.80 )
+        {
+            this.turnDirection = -Math.sign( this.rightAxisX );
+            this.turnInProgress = true;
+            this.turnTime = 0;
+            this.turnReady = false;
+        }
+
+        if (this.turnInProgress)
+        {
+            this.turnTime += deltaTime / 1000;
+            this.player.object3D.rotation.y += this.turnDirection * (this.turnAmount / this.turnDuration) * (deltaTime / 1000);
+            
+            if (this.turnTime >= this.turnDuration)
+                this.turnInProgress = false;
+        }
+    }
+});
+</script>
+
+<a-scene xstats environment="preset: checkerboard;" keyboard-shortcuts="enterVR: false;">
+	  
+	<a-assets>
+		<canvas id="canvas" width=256 height=240></canvas>
+		<a-asset-item id="television" src="models/television.glb">  </a-asset-item>
+		<a-asset-item id="table"      src="models/table.glb">       </a-asset-item>
+	</a-assets>
+ 
+
+	<a-entity 
+		id="player"
+	    position="0 1.6 0"
+		extended-wasd-controls="moveSpeed: 1; flyEnabled: true; turnEnabled: true; lookEnabled: true;">
+		
+		<a-camera wasd-controls-enabled="false" position="0 0 0">
+			
+			<a-entity light="type: point; color: #888888; distance: 40;"></a-entity>
+
+		</a-camera>
+
+		<a-entity id="left-controller"  oculus-touch-controls="hand: left;"></a-entity>
+		<a-entity id="right-controller" oculus-touch-controls="hand: right;"></a-entity>
+
+	</a-entity>
+
+
+	<a-entity id="tv" gltf-model="#television" position="0 1.2 -1.4" rotation="-90 0 0" >
+		<a-plane
+			id = "canvas-display"
+			width = "3" height = "3"
+			position = "-0.01 -0.38 0.44"
+			rotation="90 0 0"
+			scale="0.26 0.22 1.0"
+			material = "shader: flat; src: #canvas;"
+			nes-canvas>
+		</a-plane>
+			
+		<a-entity gltf-model="#table" gltf-modifier="color: #444444;" 
+		          position="0 0 0" rotation="90 0 0" scale="0.35 0.60 0.30" ></a-entity>
+	</a-entity>
+
+</a-scene>
+
+</body>
+</html>

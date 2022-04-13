@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+	<title>NES</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=">
+	<script src="js/jsnes.min.js"></script>	
+</head>
+<body>
+
+<div>
+<canvas id="nes-canvas" width="256" height="240" style="background: #000"/>
+</div>
+<div>Press any key to start the emulator.</div>
+<div>Control with Arrow keys (D-pad), X (B), C (A), Space (Select), Enter (Start)</div>
+
+<script> 
+
+var nesRunning = false;
+
+async function nesStart()
+{
+	nesRunning = true;
+
+	var canvas  = document.getElementById("nes-canvas");
+	var context = canvas.getContext("2d");
+	var image   = context.getImageData(0, 0, 256, 240);	
+	var framebuffer = new ArrayBuffer(image.data.length);
+	var framebuffer_u8 = new Uint8ClampedArray(framebuffer);
+	var framebuffer_u32 = new Uint32Array(framebuffer);
+
+	// AUDIO WORKLET
+	const audioContext = new AudioContext();
+	await audioContext.audioWorklet.addModule('js/audio-worklet.js');
+	const nesAudioNode = new AudioWorkletNode(audioContext, 'nes-audio-processor')
+	nesAudioNode.connect(audioContext.destination)
+
+	const urlParams = new URLSearchParams(window.location.search);
+
+	const fileBase = (urlParams.has("file")) ? urlParams.get("file") : "LJ65";
+	const fileName = "roms/" + fileBase + ".nes";
+
+	const req = new XMLHttpRequest();
+	req.open("GET", fileName);
+	req.overrideMimeType("text/plain; charset=x-user-defined");
+	req.onerror = function() { console.log(`Error loading ${path}: ${req.statusText}`); }
+	req.onload = function() 
+	{
+		var nes = new jsnes.NES({
+
+			onFrame: function(framebuffer_24)
+			{
+				for(var i = 0; i < 256*240; i++) 
+					framebuffer_u32[i] = 0xFF000000 | framebuffer_24[i];
+				image.data.set(framebuffer_u8);
+				context.putImageData(image, 0, 0);
+			},
+
+			onAudioSample: function(left, right)
+			{
+				nesAudioNode.port.postMessage({left: left, right: right});
+			},
+		});
+
+		nes.loadROM(req.responseText);
+
+		// 60 fps loop
+	    setInterval(nes.frame, 16.6);
+
+		// 88: "X", 67: "C", 32: Space, 13: Enter
+	    var keyNames = {
+	      37: "LEFT", 38: "UP", 39: "RIGHT",  40: "DOWN",
+	      88: "B",    67: "A",  32: "SELECT", 13: "START"
+	    };
+
+	    // controller #1 key listeners
+	    onkeydown = function(eventData)
+	    {  nes.buttonDown(1, jsnes.Controller["BUTTON_" + keyNames[eventData.keyCode]] );  }
+
+	    onkeyup = function(eventData)
+	    {  nes.buttonUp(1, jsnes.Controller["BUTTON_" + keyNames[eventData.keyCode]] );  }
+
+	};
+	req.send();
+
+}
+
+
+// user interaction required before creating AudioContext
+onkeydown = function(eventData)
+{  
+	if (!nesRunning)
+		nesStart();
+}
+
+
+
+
+
+</script>
+</body>
+</html>

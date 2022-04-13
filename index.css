@@ -1,0 +1,94 @@
+body
+{
+	background-color: #eeeeee;
+	background-image: url("pixels.png");
+	background-repeat: repeat;
+	background-attachment: fixed; 
+	background-position: top left;  
+	
+	font-family: Georgia, Serif;	
+	font-size: 16px;
+	text-shadow: 1px 1px 0px #aaa;
+}
+
+
+.bigTitle
+{
+	font-size: 32px;
+	font-weight: bold;
+	font-variantx: small-caps;
+	color:#004;
+	text-align: center;
+	text-shadow: -1px -1px 2px #fff, 1px 1px 3px #000;	
+}
+
+.demo-table
+{
+	margin: 8px;
+}
+
+.demo-image
+{
+	height: 150px;
+	width: 225px;
+	border: 1px solid #000000;
+	margin: 0px 20px 0px 0px;
+	
+	/* Rounded corners */
+	-moz-border-radius: 15px 15px 15px 15px;
+	-webkit-border-radius: 15px 15px 15px 15px;
+	border-radius: 15px 15px 15px 15px;
+}
+
+.demo-title
+{
+	/* add a bit of padding */
+	font-size: 20px;
+	padding-top: 10px; 
+	padding-bottom: 10px;
+	text-decoration: underline;
+}
+
+.demo-text
+{
+	/* expand to fill width of table */
+	width: 100%; 
+	height: 100%;
+	vertical-align: top;
+}
+
+a 
+{
+
+	font-weight: bold;
+	font-variantx: small-caps;
+	color:#00c;
+	text-shadow: 1px 1px 0px #aaa;
+	margin: 13px 0px 0px 0px;
+	text-decoration: none;
+	
+	-webkit-transition: all 300ms ease-in-out;
+	-moz-transition: all 300ms ease-in-out;
+	-o-transition: all 300ms ease-in-out;
+	-ms-transition: all 300ms ease-in-out;
+	transition: all 300ms ease-in-out; 
+}
+
+a:hover 
+{
+	color:#c00;
+	/*text-shadow: 1px 1px 0px #f00;
+	/* gradual change */
+	-webkit-transition: all 300ms ease-in-out;
+	-moz-transition: all 300ms ease-in-out;
+	-o-transition: all 300ms ease-in-out;
+	-ms-transition: all 300ms ease-in-out;
+	transition: all 300ms ease-in-out; 
+}
+
+.code
+{
+	font-family: monospace;
+	font-weight: bold;
+
+}
