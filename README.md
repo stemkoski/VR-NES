@@ -9,6 +9,10 @@ This page contains examples of NES (Nintendo Entertainment System) emulation usi
 </p>
 
 <p>
+Demonstration video available <a href="https://www.youtube.com/watch?v=47tEJkmtauc">here</a>.
+</p>
+
+<p>
 Special thanks to Xem and the JSNES-lite project (<a href="https://github.com/xem/jsnes-lite">GitHub</a>, <a href="https://twitter.com/MaximeEuziere/status/1316455403274858501">Twitter</a>, <a href="https://xem.github.io/articles/nes.html">blog</a>), who is working hard to make NES emulators easier to understand and easier to use for everyone!
 </p>
 
