@@ -1,6 +1,9 @@
 # VR-NES
-NES emulation for VR
+NES emulation in VR
 
+<p align="center">
+<img src="https://raw.githubusercontent.com/stemkoski/VR-NES/main/vr-nes.jpg" width="480">
+</p>
 
 This page contains examples of NES (Nintendo Entertainment System) emulation using Javascript. All the examples are based on the JSNES project (<a href="https://github.com/bfirsh/jsnes">GitHub</a>), maintained by Ben Firshman.
 </p>
